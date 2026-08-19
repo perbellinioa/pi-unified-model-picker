@@ -1,0 +1,20 @@
+github-copilot models  10/20
+
+   Model 06
+   Context 1M   Reasoning Medium
+   Model 07
+   Context 1M   Reasoning Medium
+   Model 08
+   Context 1M   Reasoning Medium
+   Model 09 超長いモデル名 🚀 with an[0m...[0m
+   Context 1M   Reasoning Medium
+>✓ Model 10
+   Context ← 1M →   Reasoning —
+   Model 11
+   Context 1M   Reasoning Medium
+   Model 12
+   Context 1M   Reasoning Medium
+   Model 13
+   Context 1M   Reasoning Medium
+
+↑↓ • tab • ←→ • enter • esc

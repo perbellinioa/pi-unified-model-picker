@@ -48,15 +48,6 @@ export function getContextBudgetOptions(model: Pick<Model<Api>, "contextWindow" 
     .sort((a, b) => a - b);
 }
 
-export function filterModels(models: readonly Model<Api>[], provider: string | undefined, query: string): Model<Api>[] {
-  const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-  return models.filter((model) => {
-    if (provider && model.provider !== provider) return false;
-    const haystack = `${model.provider} ${model.id} ${model.name}`.toLocaleLowerCase();
-    return terms.every((term) => haystack.includes(term));
-  });
-}
-
 export function sortModels(models: readonly Model<Api>[], recent: readonly RecentModel[]): Model<Api>[] {
   const rank = new Map(recent.map((entry, index) => [`${entry.provider}/${entry.id}`, index]));
   return [...models].sort((a, b) => {
@@ -72,13 +63,22 @@ export function addRecentModel(recent: readonly RecentModel[], model: Pick<Model
 }
 
 /**
- * Return user-facing reasoning efforts. `off` is a feature toggle rather than
- * an effort, and Pi's `minimal` level is commonly an alias for provider `low`.
- * The picker omits both while preserving explicit xhigh and max capabilities
- * from the model catalog. An empty list means reasoning is unavailable.
+ * Return distinct user-facing reasoning efforts. `off` is a feature toggle,
+ * not an effort. Provider aliases are de-duplicated in favor of the level
+ * whose name matches the effective provider value (for example low wins over
+ * a minimal→low alias). Genuine provider `minimal` support is preserved.
  */
 export function getSelectableThinkingLevels(model: Model<Api>): ModelThinkingLevel[] {
-  return getSupportedThinkingLevels(model).filter((level) => level !== "off" && level !== "minimal");
+  const candidates = getSupportedThinkingLevels(model).filter((level) => level !== "off");
+  const effective = (level: ModelThinkingLevel): string => model.thinkingLevelMap?.[level] ?? level;
+  const preferredByValue = new Map<string, ModelThinkingLevel>();
+  for (const level of candidates) {
+    const value = effective(level);
+    const previous = preferredByValue.get(value);
+    if (!previous || level === value) preferredByValue.set(value, level);
+  }
+  const selected = new Set(preferredByValue.values());
+  return candidates.filter((level) => selected.has(level));
 }
 
 export function normalizeThinkingLevel(

@@ -16,6 +16,7 @@
     "src/",
     "docs/",
     "README.md",
+    "BENCHMARKS.md",
     "LICENSE"
   ],
   "pi": {
@@ -26,6 +27,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "benchmark": "tsx scripts/benchmark.ts",
     "validate": "npm run check && npm test"
   },
   "peerDependencies": {
@@ -41,6 +43,6 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.19.0"
   }
 }

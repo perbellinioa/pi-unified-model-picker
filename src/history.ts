@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { RecentModel } from "./model-options.js";
@@ -22,8 +23,27 @@ export async function readHistory(path: string): Promise<RecentModel[]> {
 }
 
 export async function writeHistory(path: string, recent: readonly RecentModel[]): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify({ recent }, null, 2)}\n`, "utf8");
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify({ recent }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   await rename(temporary, path);
+}
+
+/** Serialize writes so rapid model changes cannot race or leave stale history. */
+export class HistoryStore {
+  private pending: Promise<void> = Promise.resolve();
+
+  constructor(private readonly path: string) {}
+
+  async read(): Promise<RecentModel[]> {
+    await this.pending;
+    return readHistory(this.path);
+  }
+
+  write(recent: readonly RecentModel[]): Promise<void> {
+    const snapshot = [...recent];
+    const operation = this.pending.then(() => writeHistory(this.path, snapshot));
+    this.pending = operation.catch(() => undefined);
+    return operation;
+  }
 }

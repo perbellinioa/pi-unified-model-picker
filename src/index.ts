@@ -1,54 +1,30 @@
 import { join } from "node:path";
-import {
-  type Api,
-  type Model,
-  type ModelThinkingLevel,
-} from "@earendil-works/pi-ai";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   getAgentDir,
   type ExtensionAPI,
   type ExtensionCommandContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { readHistory, writeHistory } from "./history.js";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
+import { HistoryStore } from "./history.js";
 import {
   addRecentModel,
   formatTokenCount,
-  getContextBudgetOptions,
-  getSelectableThinkingLevels,
   modelKey,
-  normalizeThinkingLevel,
-  sortModels,
   type RecentModel,
 } from "./model-options.js";
-
-type Field = "context" | "reasoning";
-
-interface PickerChoice {
-  model: Model<Api>;
-  contextBudget: number;
-  thinkingLevel: ModelThinkingLevel;
-}
+import {
+  ListSelection,
+  ModelPickerState,
+  type PickerChoice,
+} from "./picker-state.js";
+import {
+  ModelPickerRenderer,
+  ProviderPickerRenderer,
+} from "./render.js";
 
 const HISTORY_PATH = join(getAgentDir(), "pi-unified-model-picker", "history.json");
-
-function pad(text: string, width: number): string {
-  return text + " ".repeat(Math.max(0, width - visibleWidth(text)));
-}
-
-function cycle<T>(values: readonly T[], current: T, direction: number): T {
-  const index = Math.max(0, values.indexOf(current));
-  return values[(index + direction + values.length) % values.length]!;
-}
-
-function thinkingLabel(level: ModelThinkingLevel): string {
-  return level === "xhigh" ? "X-high" : level[0]!.toUpperCase() + level.slice(1);
-}
-
-function adjustableValue(value: string, active: boolean, hasAlternatives: boolean): string {
-  return active && hasAlternatives ? `← ${value} →` : value;
-}
 
 function availableModels(ctx: ExtensionCommandContext): Model<Api>[] {
   const models = ctx.scopedModels.length > 0
@@ -62,28 +38,17 @@ async function showProviderPicker(
   providers: readonly string[],
   initialProvider: string | undefined,
 ): Promise<string | null> {
-  let selected = Math.max(0, initialProvider ? providers.indexOf(initialProvider) : 0);
+  const initialIndex = initialProvider ? providers.indexOf(initialProvider) : 0;
+  const state = new ListSelection(providers, initialIndex);
+  const renderer = new ProviderPickerRenderer();
 
   return ctx.ui.custom<string | null>((tui, theme: Theme, _keybindings, done) => ({
-    render(width: number): string[] {
-      return [
-        truncateToWidth(theme.fg("accent", theme.bold("Select provider")), width),
-        "",
-        ...providers.map((provider, index) => {
-          const cursor = index === selected ? ">" : " ";
-          const active = provider === ctx.model?.provider ? "✓" : " ";
-          const line = truncateToWidth(`${cursor} ${active} ${provider}`, width);
-          return index === selected ? theme.bg("selectedBg", line) : line;
-        }),
-        "",
-        truncateToWidth(theme.fg("dim", "↑↓ select • enter continue • esc close"), width),
-      ];
-    },
-    invalidate() {},
+    render: (width: number) => renderer.render(state, ctx.model?.provider, width, theme, tui.terminal.rows),
+    invalidate: () => renderer.invalidate(),
     handleInput(data: string) {
-      if (matchesKey(data, Key.up)) selected = (selected - 1 + providers.length) % providers.length;
-      else if (matchesKey(data, Key.down)) selected = (selected + 1) % providers.length;
-      else if (matchesKey(data, Key.enter)) done(providers[selected]!);
+      if (matchesKey(data, Key.up)) state.move(-1);
+      else if (matchesKey(data, Key.down)) state.move(1);
+      else if (matchesKey(data, Key.enter)) done(state.selected);
       else if (matchesKey(data, Key.escape)) done(null);
       tui.requestRender();
     },
@@ -98,131 +63,45 @@ async function showModelPicker(
   recent: RecentModel[],
   canGoBack: boolean,
 ): Promise<PickerChoice | null> {
-  const models = sortModels(providerModels, recent);
-  let selected = Math.max(0, models.findIndex((model) => ctx.model && modelKey(model) === modelKey(ctx.model)));
-  let field: Field = "context";
-  const budgets = new Map<string, number>();
-  const thinking = new Map<string, ModelThinkingLevel>();
-
-  for (const model of models) {
-    const options = getContextBudgetOptions(model);
-    const isCurrent = ctx.model && modelKey(ctx.model) === modelKey(model);
-    const currentBudget = isCurrent ? ctx.model!.contextWindow : undefined;
-    budgets.set(modelKey(model), currentBudget && currentBudget <= model.contextWindow ? currentBudget : options.at(-1)!);
-
-    const levels = getSelectableThinkingLevels(model);
-    const preferred = isCurrent ? pi.getThinkingLevel() : "medium";
-    thinking.set(modelKey(model), normalizeThinkingLevel(levels, preferred));
-  }
+  const state = new ModelPickerState({
+    models: providerModels,
+    recent,
+    currentModel: ctx.model,
+    currentThinkingLevel: pi.getThinkingLevel(),
+  });
+  const renderer = new ModelPickerRenderer(provider, canGoBack);
 
   return ctx.ui.custom<PickerChoice | null>((tui, theme: Theme, _keybindings, done) => ({
-    render(width: number): string[] {
-      const narrow = width < 78;
-      const visibleRows = narrow ? 8 : 15;
-      const start = Math.max(0, Math.min(selected - Math.floor(visibleRows / 2), models.length - visibleRows));
-      const visible = models.slice(start, start + visibleRows);
-      const lines: string[] = [theme.fg("accent", theme.bold(`${provider} models`)), ""];
-
-      if (!narrow) {
-        const contextWidth = 15;
-        const reasoningWidth = 15;
-        const nameWidth = Math.max(18, width - contextWidth - reasoningWidth - 4);
-        lines.push(theme.fg("dim", truncateToWidth(`  ${pad("Model", nameWidth)} ${pad("Context", contextWidth)} Reasoning`, width)));
-
-        for (let row = 0; row < visible.length; row++) {
-          const model = visible[row]!;
-          const index = start + row;
-          const key = modelKey(model);
-          const contextOptions = getContextBudgetOptions(model);
-          const currentBudget = budgets.get(key)!;
-          const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
-          const levels = getSelectableThinkingLevels(model);
-          const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
-          const reasoning = levels.length === 0
-            ? "—"
-            : adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
-          const cursor = index === selected ? ">" : " ";
-          const active = ctx.model && modelKey(ctx.model) === key ? "✓" : " ";
-          const line = `${cursor}${active} ${pad(truncateToWidth(model.name, nameWidth), nameWidth)} ${pad(context, contextWidth)} ${reasoning}`;
-          const clipped = truncateToWidth(line, width);
-          lines.push(index === selected ? theme.bg("selectedBg", clipped) : clipped);
-        }
-      } else {
-        for (let row = 0; row < visible.length; row++) {
-          const model = visible[row]!;
-          const index = start + row;
-          const key = modelKey(model);
-          const contextOptions = getContextBudgetOptions(model);
-          const currentBudget = budgets.get(key)!;
-          const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
-          const levels = getSelectableThinkingLevels(model);
-          const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
-          const reasoning = levels.length === 0
-            ? "—"
-            : adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
-          const cursor = index === selected ? ">" : " ";
-          const active = ctx.model && modelKey(ctx.model) === key ? "✓" : " ";
-          const title = truncateToWidth(`${cursor}${active} ${model.name}`, width);
-          const values = truncateToWidth(`   Context ${context}   Reasoning ${reasoning}`, width);
-          if (index === selected) {
-            lines.push(theme.bg("selectedBg", title), theme.bg("selectedBg", values));
-          } else {
-            lines.push(title, values);
-          }
-        }
-      }
-
-      lines.push(
-        "",
-        truncateToWidth(
-          theme.fg("dim", `↑↓ model • tab field • ←→ change • enter select • esc ${canGoBack ? "back" : "close"}`),
-          width,
-        ),
-      );
-      return lines;
-    },
-    invalidate() {},
+    render: (width: number) => renderer.render(state, width, theme, tui.terminal.rows),
+    invalidate: () => renderer.invalidate(),
     handleInput(data: string) {
-      if (matchesKey(data, Key.up)) selected = (selected - 1 + models.length) % models.length;
-      else if (matchesKey(data, Key.down)) selected = (selected + 1) % models.length;
-      else if (matchesKey(data, Key.tab) || matchesKey(data, Key.shift("tab"))) {
-        field = field === "context" ? "reasoning" : "context";
-      } else if (matchesKey(data, Key.left) || matchesKey(data, Key.right)) {
-        const direction = matchesKey(data, Key.left) ? -1 : 1;
-        const model = models[selected]!;
-        const key = modelKey(model);
-        if (field === "context") {
-          const current = budgets.get(key)!;
-          const options = [...new Set([...getContextBudgetOptions(model), current])].sort((a, b) => a - b);
-          if (options.length > 1) budgets.set(key, cycle(options, current, direction));
-        } else {
-          const levels = getSelectableThinkingLevels(model);
-          if (levels.length > 1) thinking.set(key, cycle(levels, thinking.get(key)!, direction));
-        }
-      } else if (matchesKey(data, Key.enter)) {
-        const model = models[selected]!;
-        const key = modelKey(model);
-        done({ model, contextBudget: budgets.get(key)!, thinkingLevel: thinking.get(key)! });
-      } else if (matchesKey(data, Key.escape)) {
-        done(null);
-      }
+      if (matchesKey(data, Key.up)) state.move(-1);
+      else if (matchesKey(data, Key.down)) state.move(1);
+      else if (matchesKey(data, Key.tab) || matchesKey(data, Key.shift("tab"))) state.toggleField();
+      else if (matchesKey(data, Key.left)) state.adjust(-1);
+      else if (matchesKey(data, Key.right)) state.adjust(1);
+      else if (matchesKey(data, Key.enter)) done(state.choice());
+      else if (matchesKey(data, Key.escape)) done(null);
       tui.requestRender();
     },
   }));
 }
 
 export default function unifiedModelPicker(pi: ExtensionAPI) {
+  const history = new HistoryStore(HISTORY_PATH);
   let recent: RecentModel[] = [];
 
   pi.on("session_start", async (_event, ctx) => {
-    recent = await readHistory(HISTORY_PATH);
+    recent = await history.read();
     if (ctx.model) recent = addRecentModel(recent, ctx.model);
   });
 
+  // Model selection is the single authoritative history write path. This also
+  // captures model changes made outside this picker.
   pi.on("model_select", async (event) => {
     recent = addRecentModel(recent, event.model);
     try {
-      await writeHistory(HISTORY_PATH, recent);
+      await history.write(recent);
     } catch (error) {
       console.error(`pi-unified-model-picker: failed to save history: ${String(error)}`);
     }
@@ -258,8 +137,6 @@ export default function unifiedModelPicker(pi: ExtensionAPI) {
             return;
           }
           pi.setThinkingLevel(choice.thinkingLevel);
-          recent = addRecentModel(recent, choice.model);
-          await writeHistory(HISTORY_PATH, recent).catch(() => undefined);
           ctx.ui.notify(
             `Using ${choice.model.provider}/${choice.model.id} • context ${formatTokenCount(choice.contextBudget)} • reasoning ${choice.model.reasoning ? choice.thinkingLevel : "none"}`,
             "info",

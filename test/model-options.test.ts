@@ -3,7 +3,6 @@ import test from "node:test";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   addRecentModel,
-  filterModels,
   formatTokenCount,
   getContextBudgetOptions,
   getSelectableThinkingLevels,
@@ -44,15 +43,6 @@ test("small windows fall back to their advertised maximum", () => {
   assert.deepEqual(getContextBudgetOptions(model({ contextWindow: 8_192, maxTokens: 4_096 })), [8_192]);
 });
 
-test("filters across provider, id, and display name", () => {
-  const models = [
-    model(),
-    model({ provider: "provider-b", id: "vision-b", name: "Vision Beta" }),
-  ];
-  assert.deepEqual(filterModels(models, undefined, "provider-b vision"), [models[1]]);
-  assert.deepEqual(filterModels(models, "provider-a", "beta"), []);
-});
-
 test("recent models sort first and are de-duplicated", () => {
   const first = model();
   const second = model({ provider: "provider-b", id: "model-b", name: "Model B" });
@@ -64,12 +54,21 @@ test("recent models sort first and are de-duplicated", () => {
   assert.deepEqual(sortModels([first, second], recent), [second, first]);
 });
 
-test("omits the duplicate minimal abstraction from reasoning choices", () => {
+test("de-duplicates provider aliases while preserving canonical low", () => {
   assert.deepEqual(
     getSelectableThinkingLevels(model({
       thinkingLevelMap: { minimal: "low", low: "low", xhigh: "xhigh", max: "max" },
     })),
     ["low", "medium", "high", "xhigh", "max"],
+  );
+});
+
+test("preserves genuine provider minimal support", () => {
+  assert.deepEqual(
+    getSelectableThinkingLevels(model({
+      thinkingLevelMap: { minimal: "minimal", low: "low", medium: "medium", high: "high" },
+    })),
+    ["minimal", "low", "medium", "high"],
   );
 });
 

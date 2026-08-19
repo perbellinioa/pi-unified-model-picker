@@ -1,0 +1,20 @@
+github-copilot models  10/20
+
+  Model                                       Context         Reasoning      
+   Model 03                                    1M              Medium         
+   Model 04                                    1M              Medium         
+   Model 05                                    1M              —              
+   Model 06                                    1M              Medium         
+   Model 07                                    1M              Medium         
+   Model 08                                    1M              Medium         
+   Model 09 超長いモデル名 🚀 with an excep[0m...[0m 1M              Medium         
+>✓ Model 10                                    ← 1M →          —              
+   Model 11                                    1M              Medium         
+   Model 12                                    1M              Medium         
+   Model 13                                    1M              Medium         
+   Model 14                                    1M              Medium         
+   Model 15                                    1M              —              
+   Model 16                                    1M              Medium         
+   Model 17                                    1M              Medium         
+
+↑↓ model • tab field • ←→ change • enter select • esc back

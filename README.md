@@ -12,7 +12,9 @@ A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-m
 - Model, context, and reasoning selection in one lean screen
 - Reasoning levels from pi's native `getSupportedThinkingLevels()` API
 - Safe context options that never exceed the advertised model window
-- Recent-model ordering persisted locally
+- Recent-model ordering persisted locally through a serialized atomic writer
+- Revision- and width-aware render caching
+- Responsive wide/narrow layouts proven at every width from 1 through 500 cells and heights from 6 through 80 rows
 - One-step selection through `/model-picker`
 
 > **Context budget:** this changes pi's local context/compaction budget for the selected model. It does not change the remote model's actual context window. The picker never offers a budget above the model's advertised maximum.
@@ -20,7 +22,7 @@ A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-m
 ## Requirements
 
 - pi 0.84 or newer
-- Node.js 20 or newer
+- Node.js 22.19 or newer
 - Interactive TUI mode
 
 ## Install
@@ -76,7 +78,10 @@ It contains only provider and model identifiers—no credentials.
 ```bash
 npm install
 npm run validate
+npm run benchmark
 ```
+
+The test suite includes state transitions, concurrent history writes, render-cache invalidation, Unicode and long-name handling, exact golden output at 40/77/78/120 cells, and line-width invariants for both adjustable fields and both screens at every width from 1 through 500 cells, plus viewport-height bounds from 6 through 80 rows. See [BENCHMARKS.md](BENCHMARKS.md) for measured baselines.
 
 The package uses pi's current APIs:
 
