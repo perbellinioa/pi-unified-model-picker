@@ -1,9 +1,12 @@
 import {
+  clampThinkingLevel,
   getSupportedThinkingLevels,
   type Api,
   type Model,
   type ModelThinkingLevel,
 } from "@earendil-works/pi-ai";
+
+export const RECENT_MODEL_LIMIT = 12;
 
 export const STANDARD_CONTEXT_BUDGETS = [
   16_000,
@@ -26,15 +29,11 @@ export function modelKey(model: Pick<Model<Api>, "provider" | "id">): string {
 }
 
 export function formatTokenCount(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    const millions = tokens / 1_000_000;
-    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`;
-  }
-  if (tokens >= 1_000) {
-    const thousands = tokens / 1_000;
-    return `${Number.isInteger(thousands) ? thousands : thousands.toFixed(1)}K`;
-  }
-  return String(tokens);
+  if (tokens < 1_000) return String(tokens);
+  if (tokens < 10_000) return `${(tokens / 1_000).toFixed(1)}K`;
+  if (tokens < 999_500) return `${Math.round(tokens / 1_000)}K`;
+  if (tokens < 10_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  return `${Math.round(tokens / 1_000_000)}M`;
 }
 
 /**
@@ -57,19 +56,36 @@ export function sortModels(models: readonly Model<Api>[], recent: readonly Recen
   });
 }
 
-export function addRecentModel(recent: readonly RecentModel[], model: Pick<Model<Api>, "provider" | "id">, limit = 12): RecentModel[] {
+export function addRecentModel(
+  recent: readonly RecentModel[],
+  model: Pick<Model<Api>, "provider" | "id">,
+  limit = RECENT_MODEL_LIMIT,
+): RecentModel[] {
   const next = { provider: model.provider, id: model.id };
   return [next, ...recent.filter((entry) => entry.provider !== next.provider || entry.id !== next.id)].slice(0, limit);
 }
 
+export function mergeRecentModels(
+  primary: readonly RecentModel[],
+  secondary: readonly RecentModel[],
+  limit = RECENT_MODEL_LIMIT,
+): RecentModel[] {
+  const merged = [...primary];
+  for (const entry of secondary) {
+    if (!merged.some((item) => item.provider === entry.provider && item.id === entry.id)) merged.push(entry);
+  }
+  return merged.slice(0, limit);
+}
+
 /**
- * Return distinct user-facing reasoning efforts. `off` is a feature toggle,
- * not an effort. Provider aliases are de-duplicated in favor of the level
- * whose name matches the effective provider value (for example low wins over
- * a minimal→low alias). Genuine provider `minimal` support is preserved.
+ * Return distinct user-facing thinking choices. Provider aliases are
+ * de-duplicated in favor of the level whose name matches the effective value
+ * (for example low wins over a minimal→low alias). Genuine `off` and
+ * `minimal` support is preserved.
  */
 export function getSelectableThinkingLevels(model: Model<Api>): ModelThinkingLevel[] {
-  const candidates = getSupportedThinkingLevels(model).filter((level) => level !== "off");
+  if (!model.reasoning) return [];
+  const candidates = getSupportedThinkingLevels(model);
   const effective = (level: ModelThinkingLevel): string => model.thinkingLevelMap?.[level] ?? level;
   const preferredByValue = new Map<string, ModelThinkingLevel>();
   for (const level of candidates) {
@@ -82,10 +98,13 @@ export function getSelectableThinkingLevels(model: Model<Api>): ModelThinkingLev
 }
 
 export function normalizeThinkingLevel(
+  model: Model<Api>,
   levels: readonly ModelThinkingLevel[],
   preferred: ModelThinkingLevel,
 ): ModelThinkingLevel {
   if (levels.includes(preferred)) return preferred;
-  if (levels.includes("medium")) return "medium";
-  return levels[0] ?? "off";
+  const clamped = clampThinkingLevel(model, preferred);
+  if (levels.includes(clamped)) return clamped;
+  const effective = model.thinkingLevelMap?.[clamped] ?? clamped;
+  return levels.find((level) => (model.thinkingLevelMap?.[level] ?? level) === effective) ?? levels[0] ?? "off";
 }

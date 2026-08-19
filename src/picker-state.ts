@@ -18,7 +18,6 @@ export interface PickerChoice {
 }
 
 export interface PickerRow {
-  key: string;
   name: string;
   selected: boolean;
   current: boolean;
@@ -26,6 +25,12 @@ export interface PickerRow {
   reasoning: string;
   contextAdjustable: boolean;
   reasoningAdjustable: boolean;
+}
+
+export interface PickerWindow {
+  rows: PickerRow[];
+  above: number;
+  below: number;
 }
 
 interface ModelSelection {
@@ -37,18 +42,8 @@ interface ModelSelection {
   reasoningIndex: number;
 }
 
-function nearestIndex(values: readonly number[], preferred: number | undefined): number {
-  if (preferred === undefined) return values.length - 1;
-  const exact = values.indexOf(preferred);
-  if (exact >= 0) return exact;
-  let nearest = 0;
-  for (let index = 1; index < values.length; index++) {
-    if (Math.abs(values[index]! - preferred) < Math.abs(values[nearest]! - preferred)) nearest = index;
-  }
-  return nearest;
-}
-
 function thinkingLabel(level: ModelThinkingLevel): string {
+  if (level === "off") return "Disabled";
   return level === "xhigh" ? "X-high" : level[0]!.toUpperCase() + level.slice(1);
 }
 
@@ -70,6 +65,17 @@ export class ListSelection<T> {
     this.revision += 1;
     return true;
   }
+
+  page(direction: number, pageSize: number): boolean {
+    const next = Math.max(0, Math.min(
+      this.items.length - 1,
+      this.index + Math.sign(direction) * Math.max(1, Math.floor(pageSize)),
+    ));
+    if (next === this.index) return false;
+    this.index = next;
+    this.revision += 1;
+    return true;
+  }
 }
 
 export class ModelPickerState {
@@ -85,6 +91,7 @@ export class ModelPickerState {
     recent: readonly RecentModel[];
     currentModel?: Model<Api>;
     currentThinkingLevel: ModelThinkingLevel;
+    preferredThinkingLevels?: ReadonlyMap<string, ModelThinkingLevel>;
   }) {
     if (options.models.length === 0) throw new Error("ModelPickerState requires at least one model");
     this.models = sortModels(options.models, options.recent);
@@ -93,19 +100,22 @@ export class ModelPickerState {
     this.selections = this.models.map((model) => {
       const key = modelKey(model);
       const isCurrent = key === this.currentModelKey;
-      const standardContexts = getContextBudgetOptions(model);
-      const currentContext = isCurrent && options.currentModel!.contextWindow <= model.contextWindow
-        ? options.currentModel!.contextWindow
+      const currentContext = isCurrent && options.currentModel && options.currentModel.contextWindow <= model.contextWindow
+        ? options.currentModel.contextWindow
         : undefined;
-      const contextOptions = [...new Set([...standardContexts, ...(currentContext ? [currentContext] : [])])].sort((a, b) => a - b);
+      const contextOptions = [
+        ...new Set([...getContextBudgetOptions(model), ...(currentContext ? [currentContext] : [])]),
+      ].sort((a, b) => a - b);
       const reasoningOptions = getSelectableThinkingLevels(model);
-      const preferredReasoning = isCurrent ? options.currentThinkingLevel : "medium";
-      const normalizedReasoning = normalizeThinkingLevel(reasoningOptions, preferredReasoning);
+      const preferredReasoning = isCurrent
+        ? options.currentThinkingLevel
+        : options.preferredThinkingLevels?.get(key) ?? "medium";
+      const normalizedReasoning = normalizeThinkingLevel(model, reasoningOptions, preferredReasoning);
       return {
         model,
         key,
         contextOptions,
-        contextIndex: nearestIndex(contextOptions, currentContext),
+        contextIndex: currentContext === undefined ? contextOptions.length - 1 : contextOptions.indexOf(currentContext),
         reasoningOptions,
         reasoningIndex: Math.max(0, reasoningOptions.indexOf(normalizedReasoning)),
       };
@@ -118,7 +128,20 @@ export class ModelPickerState {
 
   move(direction: number): boolean {
     if (this.selections.length < 2 || direction === 0) return false;
-    this.selectedIndexValue = (this.selectedIndexValue + Math.sign(direction) + this.selections.length) % this.selections.length;
+    this.selectedIndexValue = (
+      this.selectedIndexValue + Math.sign(direction) + this.selections.length
+    ) % this.selections.length;
+    this.revision += 1;
+    return true;
+  }
+
+  page(direction: number, pageSize: number): boolean {
+    const next = Math.max(0, Math.min(
+      this.selections.length - 1,
+      this.selectedIndexValue + Math.sign(direction) * Math.max(1, Math.floor(pageSize)),
+    ));
+    if (next === this.selectedIndexValue) return false;
+    this.selectedIndexValue = next;
     this.revision += 1;
     return true;
   }
@@ -133,11 +156,17 @@ export class ModelPickerState {
     const delta = Math.sign(direction);
     if (delta === 0) return false;
     if (this.field === "context") {
-      if (selection.contextOptions.length < 2) return false;
-      selection.contextIndex = (selection.contextIndex + delta + selection.contextOptions.length) % selection.contextOptions.length;
+      const next = Math.max(0, Math.min(
+        selection.contextOptions.length - 1,
+        selection.contextIndex + delta,
+      ));
+      if (next === selection.contextIndex) return false;
+      selection.contextIndex = next;
     } else {
       if (selection.reasoningOptions.length < 2) return false;
-      selection.reasoningIndex = (selection.reasoningIndex + delta + selection.reasoningOptions.length) % selection.reasoningOptions.length;
+      selection.reasoningIndex = (
+        selection.reasoningIndex + delta + selection.reasoningOptions.length
+      ) % selection.reasoningOptions.length;
     }
     this.revision += 1;
     return true;
@@ -152,18 +181,19 @@ export class ModelPickerState {
     };
   }
 
-  rows(maxRows: number): { start: number; rows: PickerRow[] } {
+  window(maxRows: number): PickerWindow {
     const count = Math.max(1, Math.floor(maxRows));
     const start = Math.max(0, Math.min(
       this.selectedIndexValue - Math.floor(count / 2),
       this.selections.length - count,
     ));
+    const visible = this.selections.slice(start, start + count);
     return {
-      start,
-      rows: this.selections.slice(start, start + count).map((selection, offset) => {
+      above: start,
+      below: Math.max(0, this.selections.length - start - visible.length),
+      rows: visible.map((selection, offset) => {
         const index = start + offset;
         return {
-          key: selection.key,
           name: selection.model.name,
           selected: index === this.selectedIndexValue,
           current: selection.key === this.currentModelKey,

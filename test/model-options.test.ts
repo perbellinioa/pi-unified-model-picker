@@ -6,6 +6,7 @@ import {
   formatTokenCount,
   getContextBudgetOptions,
   getSelectableThinkingLevels,
+  mergeRecentModels,
   normalizeThinkingLevel,
   sortModels,
 } from "../src/model-options.js";
@@ -28,7 +29,8 @@ function model(overrides: Partial<Model<Api>> = {}): Model<Api> {
 
 test("formats token counts compactly", () => {
   assert.equal(formatTokenCount(128_000), "128K");
-  assert.equal(formatTokenCount(1_000_000), "1M");
+  assert.equal(formatTokenCount(999_999), "1.0M");
+  assert.equal(formatTokenCount(1_000_000), "1.0M");
   assert.equal(formatTokenCount(1_500_000), "1.5M");
 });
 
@@ -59,7 +61,7 @@ test("de-duplicates provider aliases while preserving canonical low", () => {
     getSelectableThinkingLevels(model({
       thinkingLevelMap: { minimal: "low", low: "low", xhigh: "xhigh", max: "max" },
     })),
-    ["low", "medium", "high", "xhigh", "max"],
+    ["off", "low", "medium", "high", "xhigh", "max"],
   );
 });
 
@@ -68,7 +70,7 @@ test("preserves genuine provider minimal support", () => {
     getSelectableThinkingLevels(model({
       thinkingLevelMap: { minimal: "minimal", low: "low", medium: "medium", high: "high" },
     })),
-    ["minimal", "low", "medium", "high"],
+    ["off", "minimal", "low", "medium", "high"],
   );
 });
 
@@ -83,7 +85,19 @@ test("preserves explicit max support for current Claude and GPT families", () =>
   assert.equal(getSelectableThinkingLevels(gpt56).at(-1), "max");
 });
 
-test("normalizes unsupported thinking levels", () => {
-  assert.equal(normalizeThinkingLevel(["off", "low", "medium", "high"], "xhigh"), "medium");
-  assert.equal(normalizeThinkingLevel(["off"], "high"), "off");
+test("uses pi clamping for unsupported thinking levels", () => {
+  const reasoningModel = model({ thinkingLevelMap: { xhigh: null, max: null } });
+  assert.equal(normalizeThinkingLevel(reasoningModel, ["off", "minimal", "low", "medium", "high"], "xhigh"), "high");
+  const plainModel = model({ reasoning: false });
+  assert.equal(normalizeThinkingLevel(plainModel, [], "high"), "off");
+});
+
+test("merges concurrent recent history without replacing newer memory", () => {
+  assert.deepEqual(
+    mergeRecentModels(
+      [{ provider: "new", id: "latest" }],
+      [{ provider: "old", id: "disk" }, { provider: "new", id: "latest" }],
+    ),
+    [{ provider: "new", id: "latest" }, { provider: "old", id: "disk" }],
+  );
 });

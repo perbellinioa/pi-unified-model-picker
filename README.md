@@ -1,6 +1,6 @@
 # pi-unified-model-picker
 
-A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-mono). Choose the provider, model, local context budget, and supported reasoning level in one terminal screen.
+A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-mono). Choose a provider, model, local context budget, and supported reasoning level through a compact keyboard-driven flow.
 
 ![Unified model picker preview](docs/model-picker.svg)
 
@@ -9,15 +9,15 @@ A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-m
 - Models from every configured provider
 - Skips provider selection when only one provider is configured
 - Respects pi's scoped-model configuration
-- Model, context, and reasoning selection in one lean screen
+- Model, context, and reasoning selection in one lean model screen
 - Reasoning levels from pi's native `getSupportedThinkingLevels()` API
 - Safe context options that never exceed the advertised model window
 - Recent-model ordering persisted locally through a serialized atomic writer
 - Revision- and width-aware render caching
-- Responsive wide/narrow layouts proven at every width from 1 through 500 cells and heights from 6 through 80 rows
+- Responsive wide/narrow layouts with overflow checks from 1 through 500 cells and heights from 6 through 80 rows
 - One-step selection through `/model-picker`
 
-> **Context budget:** this changes pi's local context/compaction budget for the selected model. It does not change the remote model's actual context window. The picker never offers a budget above the model's advertised maximum.
+> **Context budget:** this changes pi's local context/compaction budget for the currently selected model. It does not change the remote model's actual context window, and it resets when a later model switch or new session restores the catalog model. The picker never offers a budget above the advertised maximum.
 
 ## Requirements
 
@@ -60,10 +60,13 @@ Keys:
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Select a provider or model |
-| `Tab` / `Shift+Tab` | Switch between context and reasoning |
+| `Page Up` / `Page Down` | Move by one visible page |
+| `Tab` | Switch between context and reasoning |
 | `←` / `→` | Change the active context or reasoning value |
 | `Enter` | Continue from provider selection or apply the model selection |
-| `Esc` | Return to provider selection, or close the picker |
+| `Esc` / `Ctrl+C` | Return to provider selection, or close the picker |
+
+These actions honor pi's configured `tui.select.*`, `tui.input.tab`, and cursor keybindings rather than assuming the defaults.
 
 Recent-model history is stored in:
 
@@ -81,7 +84,7 @@ npm run validate
 npm run benchmark
 ```
 
-The test suite includes state transitions, concurrent history writes, render-cache invalidation, Unicode and long-name handling, exact golden output at 40/77/78/120 cells, and line-width invariants for both adjustable fields and both screens at every width from 1 through 500 cells, plus viewport-height bounds from 6 through 80 rows. See [BENCHMARKS.md](BENCHMARKS.md) for measured baselines.
+The test suite includes state transitions, concurrent history writes, render-cache invalidation, ANSI selection styling, Unicode and long-name handling, exact golden output at 40/77/78/120 cells, alignment assertions, and line-width invariants for both adjustable fields and both screens from 1 through 500 cells, plus viewport-height bounds from 6 through 80 rows. See [BENCHMARKS.md](BENCHMARKS.md) for measured baselines.
 
 The package uses pi's current APIs:
 

@@ -2,12 +2,12 @@
   <rect width="1000" height="390" rx="14" fill="#111827"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">
     <text x="35" y="48" fill="#67e8f9" font-weight="bold">GitHub Copilot models  2/4</text>
-    <text x="35" y="95" fill="#6b7280">  Model                                  Context       Reasoning</text>
-    <text x="35" y="140" fill="#d1d5db">  Claude Opus 4.6                        264K          High</text>
+    <text x="35" y="95" fill="#6b7280">   Model                                 Context       Reasoning</text>
+    <text x="35" y="140" fill="#d1d5db">   Claude Opus 4.6                       264K          High</text>
     <rect x="24" y="157" width="952" height="42" rx="5" fill="#164e63"/>
-    <text x="35" y="186" fill="#f9fafb">&gt; Claude Sonnet 4.6                    ← 128K →       High</text>
-    <text x="35" y="231" fill="#d1d5db">  GPT-5.4                                400K          Medium</text>
-    <text x="35" y="276" fill="#d1d5db">✓ GPT-5.6                                400K          High</text>
-    <text x="35" y="340" fill="#6b7280">↑↓ model • tab field • ←→ change • enter select • esc back</text>
+    <text x="35" y="186" fill="#f9fafb">&gt;✓ Claude Sonnet 4.6                    ← 128K →      High</text>
+    <text x="35" y="231" fill="#d1d5db">   GPT-5.4                               400K          Medium</text>
+    <text x="35" y="276" fill="#d1d5db">   GPT-5.6                               400K          High</text>
+    <text x="35" y="340" fill="#6b7280">↑/↓ model • PgUp/PgDn page • Tab field • ←/→ change • Enter select • Esc back</text>
   </g>
 </svg>

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { RecentModel } from "./model-options.js";
+import { RECENT_MODEL_LIMIT, type RecentModel } from "./model-options.js";
 
 interface HistoryFile {
   recent: RecentModel[];
@@ -16,7 +16,9 @@ function isRecentModel(value: unknown): value is RecentModel {
 export async function readHistory(path: string): Promise<RecentModel[]> {
   try {
     const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<HistoryFile>;
-    return Array.isArray(parsed.recent) ? parsed.recent.filter(isRecentModel).slice(0, 12) : [];
+    return Array.isArray(parsed.recent)
+      ? parsed.recent.filter(isRecentModel).slice(0, RECENT_MODEL_LIMIT)
+      : [];
   } catch {
     return [];
   }

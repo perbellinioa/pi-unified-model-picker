@@ -1,7 +1,0 @@
-Select provider
-
-    anthropic
-> ✓ github-copilot
-    provider-with-a-very-long-name
-
-↑↓ select • enter continue • esc close
