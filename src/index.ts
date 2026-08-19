@@ -138,7 +138,9 @@ async function showModelPicker(
           const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
           const levels = getSelectableThinkingLevels(model);
           const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
-          const reasoning = adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
+          const reasoning = levels.length === 0
+            ? "—"
+            : adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
           const cursor = index === selected ? ">" : " ";
           const active = ctx.model && modelKey(ctx.model) === key ? "✓" : " ";
           const line = `${cursor}${active} ${pad(truncateToWidth(model.name, nameWidth), nameWidth)} ${pad(context, contextWidth)} ${reasoning}`;
@@ -155,7 +157,9 @@ async function showModelPicker(
           const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
           const levels = getSelectableThinkingLevels(model);
           const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
-          const reasoning = adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
+          const reasoning = levels.length === 0
+            ? "—"
+            : adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
           const cursor = index === selected ? ">" : " ";
           const active = ctx.model && modelKey(ctx.model) === key ? "✓" : " ";
           const title = truncateToWidth(`${cursor}${active} ${model.name}`, width);
@@ -257,7 +261,7 @@ export default function unifiedModelPicker(pi: ExtensionAPI) {
           recent = addRecentModel(recent, choice.model);
           await writeHistory(HISTORY_PATH, recent).catch(() => undefined);
           ctx.ui.notify(
-            `Using ${choice.model.provider}/${choice.model.id} • context ${formatTokenCount(choice.contextBudget)} • reasoning ${choice.thinkingLevel}`,
+            `Using ${choice.model.provider}/${choice.model.id} • context ${formatTokenCount(choice.contextBudget)} • reasoning ${choice.model.reasoning ? choice.thinkingLevel : "none"}`,
             "info",
           );
           return;

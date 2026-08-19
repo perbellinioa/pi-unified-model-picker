@@ -69,8 +69,12 @@ test("omits the duplicate minimal abstraction from reasoning choices", () => {
     getSelectableThinkingLevels(model({
       thinkingLevelMap: { minimal: "low", low: "low", xhigh: "xhigh", max: "max" },
     })),
-    ["off", "low", "medium", "high", "xhigh", "max"],
+    ["low", "medium", "high", "xhigh", "max"],
   );
+});
+
+test("returns no effort choices for a non-reasoning model", () => {
+  assert.deepEqual(getSelectableThinkingLevels(model({ reasoning: false })), []);
 });
 
 test("preserves explicit max support for current Claude and GPT families", () => {

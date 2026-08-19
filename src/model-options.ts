@@ -72,13 +72,13 @@ export function addRecentModel(recent: readonly RecentModel[], model: Pick<Model
 }
 
 /**
- * Return user-facing reasoning choices. Pi's `minimal` level is commonly an
- * alias for provider `low` (and is not a distinct Copilot effort), so the
- * picker omits that duplicate abstraction while preserving explicit xhigh
- * and max capabilities from the model catalog.
+ * Return user-facing reasoning efforts. `off` is a feature toggle rather than
+ * an effort, and Pi's `minimal` level is commonly an alias for provider `low`.
+ * The picker omits both while preserving explicit xhigh and max capabilities
+ * from the model catalog. An empty list means reasoning is unavailable.
  */
 export function getSelectableThinkingLevels(model: Model<Api>): ModelThinkingLevel[] {
-  return getSupportedThinkingLevels(model).filter((level) => level !== "minimal");
+  return getSupportedThinkingLevels(model).filter((level) => level !== "off" && level !== "minimal");
 }
 
 export function normalizeThinkingLevel(
