@@ -15,7 +15,6 @@ import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/
 import { readHistory, writeHistory } from "./history.js";
 import {
   addRecentModel,
-  filterModels,
   formatTokenCount,
   getContextBudgetOptions,
   modelKey,
@@ -24,7 +23,7 @@ import {
   type RecentModel,
 } from "./model-options.js";
 
-type Field = "provider" | "budget" | "reasoning";
+type Field = "context" | "reasoning";
 
 interface PickerChoice {
   model: Model<Api>;
@@ -33,7 +32,6 @@ interface PickerChoice {
 }
 
 const HISTORY_PATH = join(getAgentDir(), "pi-unified-model-picker", "history.json");
-const FIELD_ORDER: Field[] = ["provider", "budget", "reasoning"];
 
 function pad(text: string, width: number): string {
   return text + " ".repeat(Math.max(0, width - visibleWidth(text)));
@@ -48,6 +46,10 @@ function thinkingLabel(level: ModelThinkingLevel): string {
   return level === "xhigh" ? "X-high" : level[0]!.toUpperCase() + level.slice(1);
 }
 
+function adjustableValue(value: string, active: boolean, hasAlternatives: boolean): string {
+  return active && hasAlternatives ? `← ${value} →` : value;
+}
+
 function availableModels(ctx: ExtensionCommandContext): Model<Api>[] {
   const models = ctx.scopedModels.length > 0
     ? ctx.scopedModels.map((entry) => entry.model)
@@ -55,24 +57,54 @@ function availableModels(ctx: ExtensionCommandContext): Model<Api>[] {
   return [...new Map(models.map((model) => [modelKey(model), model])).values()];
 }
 
-async function showPicker(
+async function showProviderPicker(
+  ctx: ExtensionCommandContext,
+  providers: readonly string[],
+  initialProvider: string | undefined,
+): Promise<string | null> {
+  let selected = Math.max(0, initialProvider ? providers.indexOf(initialProvider) : 0);
+
+  return ctx.ui.custom<string | null>((tui, theme: Theme, _keybindings, done) => ({
+    render(width: number): string[] {
+      return [
+        truncateToWidth(theme.fg("accent", theme.bold("Select provider")), width),
+        "",
+        ...providers.map((provider, index) => {
+          const cursor = index === selected ? ">" : " ";
+          const active = provider === ctx.model?.provider ? "✓" : " ";
+          const line = truncateToWidth(`${cursor} ${active} ${provider}`, width);
+          return index === selected ? theme.bg("selectedBg", line) : line;
+        }),
+        "",
+        truncateToWidth(theme.fg("dim", "↑↓ select • enter continue • esc close"), width),
+      ];
+    },
+    invalidate() {},
+    handleInput(data: string) {
+      if (matchesKey(data, Key.up)) selected = (selected - 1 + providers.length) % providers.length;
+      else if (matchesKey(data, Key.down)) selected = (selected + 1) % providers.length;
+      else if (matchesKey(data, Key.enter)) done(providers[selected]!);
+      else if (matchesKey(data, Key.escape)) done(null);
+      tui.requestRender();
+    },
+  }));
+}
+
+async function showModelPicker(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
-  models: Model<Api>[],
+  provider: string,
+  providerModels: Model<Api>[],
   recent: RecentModel[],
+  canGoBack: boolean,
 ): Promise<PickerChoice | null> {
-  const ordered = sortModels(models, recent);
-  const providers = [undefined, ...new Set(ordered.map((model) => model.provider).sort())] as const;
-  let providerIndex = 0;
-  let query = "";
-  let searchMode = false;
-  let field: Field = "provider";
-  let selected = Math.max(0, ordered.findIndex((model) => modelKey(model) === (ctx.model ? modelKey(ctx.model) : "")));
-
+  const models = sortModels(providerModels, recent);
+  let selected = Math.max(0, models.findIndex((model) => ctx.model && modelKey(model) === modelKey(ctx.model)));
+  let field: Field = "context";
   const budgets = new Map<string, number>();
   const thinking = new Map<string, ModelThinkingLevel>();
 
-  for (const model of ordered) {
+  for (const model of models) {
     const options = getContextBudgetOptions(model);
     const isCurrent = ctx.model && modelKey(ctx.model) === modelKey(model);
     const currentBudget = isCurrent ? ctx.model!.contextWindow : undefined;
@@ -83,131 +115,92 @@ async function showPicker(
     thinking.set(modelKey(model), normalizeThinkingLevel(levels, preferred));
   }
 
-  const currentProvider = () => providers[providerIndex];
-  const visibleModels = () => filterModels(ordered, currentProvider(), query);
-  const selectedModel = () => visibleModels()[selected];
-  const clampSelection = (preferredKey?: string) => {
-    const visible = visibleModels();
-    if (preferredKey) {
-      const next = visible.findIndex((model) => modelKey(model) === preferredKey);
-      if (next >= 0) selected = next;
-    }
-    selected = Math.max(0, Math.min(selected, visible.length - 1));
-  };
-
   return ctx.ui.custom<PickerChoice | null>((tui, theme: Theme, _keybindings, done) => ({
     render(width: number): string[] {
-      const visible = visibleModels();
-      const model = selectedModel();
-      const providerName = currentProvider() ?? "All";
-      const providerControl = field === "provider" && !searchMode ? `← ${providerName} →` : providerName;
-      const searchControl = searchMode ? `${query}▌` : query || "type / to search";
-      const title = theme.fg("accent", theme.bold("Unified model picker"));
-      const controls = `Provider: ${providerControl}   Search: ${searchControl}`;
+      const narrow = width < 78;
+      const visibleRows = narrow ? 8 : 15;
+      const start = Math.max(0, Math.min(selected - Math.floor(visibleRows / 2), models.length - visibleRows));
+      const visible = models.slice(start, start + visibleRows);
+      const lines: string[] = [theme.fg("accent", theme.bold(`${provider} models`)), ""];
 
-      const providerWidth = width >= 105 ? 18 : 13;
-      const trailingWidth = width >= 105 ? 47 : 34;
-      const nameWidth = Math.max(16, width - providerWidth - trailingWidth - 5);
-      const header = `  ${pad("Provider", providerWidth)} ${pad("Model", nameWidth)} ${pad("Window", 8)} ${pad("Budget", 9)} ${pad("Reason", 9)} Caps`;
-      const start = Math.max(0, Math.min(selected - 7, visible.length - 15));
-      const rows = visible.slice(start, start + 15).map((item, rowIndex) => {
-        const index = start + rowIndex;
-        const active = ctx.model && modelKey(ctx.model) === modelKey(item) ? "✓" : " ";
-        const cursor = index === selected ? ">" : " ";
-        const key = modelKey(item);
-        const budget = budgets.get(key)!;
-        const budgetText = field === "budget" && index === selected && !searchMode
-          ? `←${formatTokenCount(budget)}→`
-          : formatTokenCount(budget);
-        const reason = thinkingLabel(thinking.get(key)!);
-        const reasonText = field === "reasoning" && index === selected && !searchMode ? `←${reason}→` : reason;
-        const capabilities = [item.input.includes("image") ? "vision" : "", item.reasoning ? "reason" : ""]
-          .filter(Boolean)
-          .join(" ") || "text";
-        const line = `${cursor}${active} ${pad(truncateToWidth(item.provider, providerWidth), providerWidth)} ${pad(truncateToWidth(item.name, nameWidth), nameWidth)} ${pad(formatTokenCount(item.contextWindow), 8)} ${pad(budgetText, 9)} ${pad(reasonText, 9)} ${capabilities}`;
-        const clipped = truncateToWidth(line, width);
-        return index === selected ? theme.bg("selectedBg", clipped) : clipped;
-      });
+      if (!narrow) {
+        const contextWidth = 15;
+        const reasoningWidth = 15;
+        const nameWidth = Math.max(18, width - contextWidth - reasoningWidth - 4);
+        lines.push(theme.fg("dim", truncateToWidth(`  ${pad("Model", nameWidth)} ${pad("Context", contextWidth)} Reasoning`, width)));
 
-      const details = model
-        ? `Selected: ${model.provider}/${model.id} • API: ${model.api} • max output: ${formatTokenCount(model.maxTokens)}`
-        : "No models match the current provider and search.";
-      const budgetHelp = model
-        ? `Context budget is local to pi; advertised model maximum: ${formatTokenCount(model.contextWindow)}.`
-        : "";
-      const help = searchMode
-        ? "Search mode • type to filter • backspace delete • enter/esc finish search"
-        : "↑↓ model • tab field • ←→ change • / search • enter select • esc cancel";
+        for (let row = 0; row < visible.length; row++) {
+          const model = visible[row]!;
+          const index = start + row;
+          const key = modelKey(model);
+          const contextOptions = getContextBudgetOptions(model);
+          const currentBudget = budgets.get(key)!;
+          const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
+          const levels = getSupportedThinkingLevels(model);
+          const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
+          const reasoning = adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
+          const cursor = index === selected ? ">" : " ";
+          const active = ctx.model && modelKey(ctx.model) === key ? "✓" : " ";
+          const line = `${cursor}${active} ${pad(truncateToWidth(model.name, nameWidth), nameWidth)} ${pad(context, contextWidth)} ${reasoning}`;
+          const clipped = truncateToWidth(line, width);
+          lines.push(index === selected ? theme.bg("selectedBg", clipped) : clipped);
+        }
+      } else {
+        for (let row = 0; row < visible.length; row++) {
+          const model = visible[row]!;
+          const index = start + row;
+          const key = modelKey(model);
+          const contextOptions = getContextBudgetOptions(model);
+          const currentBudget = budgets.get(key)!;
+          const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
+          const levels = getSupportedThinkingLevels(model);
+          const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
+          const reasoning = adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
+          const cursor = index === selected ? ">" : " ";
+          const active = ctx.model && modelKey(ctx.model) === key ? "✓" : " ";
+          const title = truncateToWidth(`${cursor}${active} ${model.name}`, width);
+          const values = truncateToWidth(`   Context ${context}   Reasoning ${reasoning}`, width);
+          if (index === selected) {
+            lines.push(theme.bg("selectedBg", title), theme.bg("selectedBg", values));
+          } else {
+            lines.push(title, values);
+          }
+        }
+      }
 
-      return [
-        truncateToWidth(title, width),
-        truncateToWidth(theme.fg("muted", controls), width),
-        truncateToWidth(theme.fg("dim", header), width),
-        ...(rows.length ? rows : [theme.fg("warning", "  No matching models")]),
+      lines.push(
         "",
-        truncateToWidth(theme.fg("accent", details), width),
-        truncateToWidth(theme.fg("dim", budgetHelp), width),
-        truncateToWidth(theme.fg("dim", help), width),
-        truncateToWidth(theme.fg("dim", `Field: ${field === "budget" ? "context budget" : field}`), width),
-      ];
+        truncateToWidth(
+          theme.fg("dim", `↑↓ model • tab field • ←→ change • enter select • esc ${canGoBack ? "back" : "close"}`),
+          width,
+        ),
+      );
+      return lines;
     },
     invalidate() {},
     handleInput(data: string) {
-      if (searchMode) {
-        const previousKey = selectedModel() ? modelKey(selectedModel()!) : undefined;
-        if (matchesKey(data, Key.escape) || matchesKey(data, Key.enter)) {
-          searchMode = false;
-        } else if (matchesKey(data, Key.backspace) || matchesKey(data, Key.delete)) {
-          query = query.slice(0, -1);
-          clampSelection(previousKey);
-        } else if (/^[\x20-\x7e]+$/.test(data)) {
-          query += data;
-          clampSelection(previousKey);
-        }
-        tui.requestRender();
-        return;
-      }
-
-      const visible = visibleModels();
-      if (matchesKey(data, Key.up) && visible.length) selected = (selected - 1 + visible.length) % visible.length;
-      else if (matchesKey(data, Key.down) && visible.length) selected = (selected + 1) % visible.length;
-      else if (matchesKey(data, Key.tab)) field = cycle(FIELD_ORDER, field, 1);
-      else if (matchesKey(data, Key.shift("tab"))) field = cycle(FIELD_ORDER, field, -1);
-      else if (matchesKey(data, Key.left) || matchesKey(data, Key.right)) {
+      if (matchesKey(data, Key.up)) selected = (selected - 1 + models.length) % models.length;
+      else if (matchesKey(data, Key.down)) selected = (selected + 1) % models.length;
+      else if (matchesKey(data, Key.tab) || matchesKey(data, Key.shift("tab"))) {
+        field = field === "context" ? "reasoning" : "context";
+      } else if (matchesKey(data, Key.left) || matchesKey(data, Key.right)) {
         const direction = matchesKey(data, Key.left) ? -1 : 1;
-        const before = selectedModel();
-        if (field === "provider") {
-          providerIndex = (providerIndex + direction + providers.length) % providers.length;
-          clampSelection(before ? modelKey(before) : undefined);
-        } else if (before) {
-          const key = modelKey(before);
-          if (field === "budget") {
-            const options = getContextBudgetOptions(before);
-            const current = budgets.get(key)!;
-            const withCurrent = [...new Set([...options, current])].sort((a, b) => a - b);
-            budgets.set(key, cycle(withCurrent, current, direction));
-          } else {
-            const levels = getSupportedThinkingLevels(before);
-            thinking.set(key, cycle(levels, thinking.get(key)!, direction));
-          }
-        }
-      } else if (data === "/" || (/^[\x20-\x7e]$/.test(data) && !matchesKey(data, Key.space))) {
-        searchMode = true;
-        if (data !== "/") query += data;
-        clampSelection();
-      } else if (matchesKey(data, Key.enter)) {
-        const choice = selectedModel();
-        if (choice) {
-          const key = modelKey(choice);
-          done({ model: choice, contextBudget: budgets.get(key)!, thinkingLevel: thinking.get(key)! });
-        }
-      } else if (matchesKey(data, Key.escape)) {
-        if (query) {
-          query = "";
-          clampSelection();
+        const model = models[selected]!;
+        const key = modelKey(model);
+        if (field === "context") {
+          const current = budgets.get(key)!;
+          const options = [...new Set([...getContextBudgetOptions(model), current])].sort((a, b) => a - b);
+          if (options.length > 1) budgets.set(key, cycle(options, current, direction));
         } else {
-          done(null);
+          const levels = getSupportedThinkingLevels(model);
+          if (levels.length > 1) thinking.set(key, cycle(levels, thinking.get(key)!, direction));
         }
+      } else if (matchesKey(data, Key.enter)) {
+        const model = models[selected]!;
+        const key = modelKey(model);
+        done({ model, contextBudget: budgets.get(key)!, thinkingLevel: thinking.get(key)! });
+      } else if (matchesKey(data, Key.escape)) {
+        done(null);
       }
       tui.requestRender();
     },
@@ -232,7 +225,7 @@ export default function unifiedModelPicker(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("model-picker", {
-    description: "Select a provider, model, context budget, and reasoning level",
+    description: "Select a provider, model, context, and reasoning level",
     handler: async (_args, ctx) => {
       if (ctx.mode !== "tui") {
         ctx.ui.notify("/model-picker requires TUI mode", "error");
@@ -245,21 +238,34 @@ export default function unifiedModelPicker(pi: ExtensionAPI) {
         return;
       }
 
-      const choice = await showPicker(pi, ctx, models, recent);
-      if (!choice) return;
+      const providers = [...new Set(models.map((model) => model.provider))].sort();
+      let provider = providers.length === 1
+        ? providers[0]!
+        : await showProviderPicker(ctx, providers, ctx.model?.provider);
 
-      const selected = { ...choice.model, contextWindow: choice.contextBudget } as Model<Api>;
-      if (!(await pi.setModel(selected))) {
-        ctx.ui.notify(`No credentials available for ${choice.model.provider}/${choice.model.id}`, "error");
-        return;
+      while (provider) {
+        const providerModels = models.filter((model) => model.provider === provider);
+        const choice = await showModelPicker(pi, ctx, provider, providerModels, recent, providers.length > 1);
+
+        if (choice) {
+          const selected = { ...choice.model, contextWindow: choice.contextBudget } as Model<Api>;
+          if (!(await pi.setModel(selected))) {
+            ctx.ui.notify(`No credentials available for ${choice.model.provider}/${choice.model.id}`, "error");
+            return;
+          }
+          pi.setThinkingLevel(choice.thinkingLevel);
+          recent = addRecentModel(recent, choice.model);
+          await writeHistory(HISTORY_PATH, recent).catch(() => undefined);
+          ctx.ui.notify(
+            `Using ${choice.model.provider}/${choice.model.id} • context ${formatTokenCount(choice.contextBudget)} • reasoning ${choice.thinkingLevel}`,
+            "info",
+          );
+          return;
+        }
+
+        if (providers.length === 1) return;
+        provider = await showProviderPicker(ctx, providers, provider);
       }
-      pi.setThinkingLevel(choice.thinkingLevel);
-      recent = addRecentModel(recent, choice.model);
-      await writeHistory(HISTORY_PATH, recent).catch(() => undefined);
-      ctx.ui.notify(
-        `Using ${choice.model.provider}/${choice.model.id} • budget ${formatTokenCount(choice.contextBudget)} • reasoning ${choice.thinkingLevel}`,
-        "info",
-      );
     },
   });
 }

@@ -1,16 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520">
-  <rect width="1100" height="520" rx="14" fill="#111827"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="390" viewBox="0 0 1000 390">
+  <rect width="1000" height="390" rx="14" fill="#111827"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">
-    <text x="35" y="48" fill="#67e8f9" font-weight="bold">Unified model picker</text>
-    <text x="35" y="88" fill="#9ca3af">Provider: [All]   Search: claude</text>
-    <text x="35" y="130" fill="#6b7280">  Provider          Model                         Window  Budget  Reasoning  Capabilities</text>
-    <rect x="24" y="148" width="1052" height="42" rx="5" fill="#164e63"/>
-    <text x="35" y="177" fill="#f9fafb">› anthropic         Claude Sonnet 4.6             200K     128K    High       vision reason</text>
-    <text x="35" y="224" fill="#d1d5db">  anthropic         Claude Opus 4.6               200K     200K    Medium     vision reason</text>
-    <text x="35" y="271" fill="#d1d5db">  github-copilot    Claude Sonnet 4.6             264K     128K    High       vision reason</text>
-    <text x="35" y="330" fill="#67e8f9">Selected: anthropic/claude-sonnet-4-6</text>
-    <text x="35" y="370" fill="#9ca3af">Context budget is a local pi compaction limit; model maximum: 200K.</text>
-    <text x="35" y="430" fill="#6b7280">↑↓ model • tab field • ←→ change • / search • enter select • esc cancel</text>
-    <text x="35" y="472" fill="#6b7280">Field: context budget</text>
+    <text x="35" y="48" fill="#67e8f9" font-weight="bold">GitHub Copilot models</text>
+    <text x="35" y="95" fill="#6b7280">  Model                                  Context       Reasoning</text>
+    <text x="35" y="140" fill="#d1d5db">  Claude Opus 4.6                        264K          High</text>
+    <rect x="24" y="157" width="952" height="42" rx="5" fill="#164e63"/>
+    <text x="35" y="186" fill="#f9fafb">&gt; Claude Sonnet 4.6                    ← 128K →       High</text>
+    <text x="35" y="231" fill="#d1d5db">  GPT-5.4                                400K          Medium</text>
+    <text x="35" y="276" fill="#d1d5db">✓ GPT-5.6                                400K          High</text>
+    <text x="35" y="340" fill="#6b7280">↑↓ model • tab field • ←→ change • enter select • esc back</text>
   </g>
 </svg>

@@ -7,11 +7,11 @@ A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-m
 ## Features
 
 - Models from every configured provider
+- Skips provider selection when only one provider is configured
 - Respects pi's scoped-model configuration
-- Provider filtering and text search
-- Model context window, maximum output, API, vision, and reasoning capabilities
+- Model, context, and reasoning selection in one lean screen
 - Reasoning levels from pi's native `getSupportedThinkingLevels()` API
-- Safe context-budget options that never exceed the advertised model window
+- Safe context options that never exceed the advertised model window
 - Recent-model ordering persisted locally
 - One-step selection through `/model-picker`
 
@@ -57,12 +57,11 @@ Keys:
 
 | Key | Action |
 | --- | --- |
-| `↑` / `↓` | Select a model |
-| `Tab` / `Shift+Tab` | Switch provider, context-budget, and reasoning fields |
-| `←` / `→` | Change the active field |
-| `/` or printable text | Enter search mode |
-| `Enter` | Finish search or select the highlighted model |
-| `Esc` | Finish search, clear a filter, or cancel |
+| `↑` / `↓` | Select a provider or model |
+| `Tab` / `Shift+Tab` | Switch between context and reasoning |
+| `←` / `→` | Change the active context or reasoning value |
+| `Enter` | Continue from provider selection or apply the model selection |
+| `Esc` | Return to provider selection, or close the picker |
 
 Recent-model history is stored in:
 
@@ -90,7 +89,8 @@ The package uses pi's current APIs:
 - Provider-neutral: discovery and authentication remain the responsibility of pi and provider extensions.
 - Non-invasive: the picker does not register or replace providers.
 - Capability-aware: reasoning choices come from the selected model definition.
-- Honest context controls: the UI calls the setting a local context budget rather than implying a provider-side context change.
+- Fluid navigation: provider selection is a separate screen and is skipped when unnecessary.
+- Honest context controls: selectable context values never exceed the provider's advertised model window.
 
 ## License
 
