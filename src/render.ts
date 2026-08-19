@@ -58,9 +58,17 @@ function renderNarrowRow(row: PickerRow, state: ModelPickerState, width: number,
   const values = rowValues(row, state);
   const cursor = row.selected ? ">" : " ";
   const current = row.current ? "✓" : " ";
+  const contextColor = row.selected && state.field === "context" ? "accent" : "muted";
+  const reasoningColor = row.selected && state.field === "reasoning" ? "accent" : "muted";
+  const details = [
+    theme.fg("dim", "   Context "),
+    theme.fg(contextColor, values.context),
+    theme.fg("dim", "   Reasoning "),
+    theme.fg(reasoningColor, values.reasoning),
+  ].join("");
   return [
     selectedLine(`${cursor}${current} ${row.name}`, row.selected, width, theme),
-    selectedLine(`   Context ${values.context}   Reasoning ${values.reasoning}`, row.selected, width, theme),
+    selectedLine(details, row.selected, width, theme),
   ];
 }
 

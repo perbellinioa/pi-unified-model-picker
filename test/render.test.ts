@@ -86,6 +86,27 @@ test("fits terminal height from 6 through 80 rows", () => {
   }
 });
 
+test("uses dim metadata with accent only on the active narrow field", () => {
+  const calls: Array<{ color: string; text: string }> = [];
+  const recordingTheme = {
+    fg: (color: string, text: string) => { calls.push({ color, text }); return text; },
+    bg: (_color: string, text: string) => text,
+    bold: (text: string) => text,
+  } as Theme;
+  const picker = state();
+  picker.move(-1); // Select a reasoning-capable model.
+  renderModelPicker(picker, "github-copilot", true, 60, recordingTheme);
+  assert.ok(calls.some((call) => call.color === "dim" && call.text === "   Context "));
+  assert.ok(calls.some((call) => call.color === "accent" && call.text.includes("←")));
+  assert.ok(calls.some((call) => call.color === "muted" && call.text === "Medium"));
+
+  calls.length = 0;
+  picker.toggleField();
+  renderModelPicker(picker, "github-copilot", true, 60, recordingTheme);
+  assert.ok(calls.some((call) => call.color === "accent" && call.text.includes("Medium")));
+  assert.ok(calls.some((call) => call.color === "muted" && call.text === "1M"));
+});
+
 test("switches layout exactly at the documented breakpoint", () => {
   const narrow = renderModelPicker(state(), "github-copilot", true, MODEL_PICKER_WIDE_BREAKPOINT - 1, plainTheme);
   const wide = renderModelPicker(state(), "github-copilot", true, MODEL_PICKER_WIDE_BREAKPOINT, plainTheme);
