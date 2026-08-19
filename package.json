@@ -27,6 +27,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "test:ui": "tsx scripts/manual-ui-test.ts",
     "benchmark": "tsx scripts/benchmark.ts",
     "validate": "npm run check && npm test"
   },

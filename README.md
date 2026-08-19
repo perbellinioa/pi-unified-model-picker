@@ -82,9 +82,12 @@ It contains only provider and model identifiers—no credentials.
 npm install
 npm run validate
 npm run benchmark
+npm run test:ui
 ```
 
-The test suite includes state transitions, concurrent history writes, render-cache invalidation, ANSI selection styling, Unicode and long-name handling, exact golden output at 40/77/78/120 cells, alignment assertions, and line-width invariants for both adjustable fields and both screens from 1 through 500 cells, plus viewport-height bounds from 6 through 80 rows. See [BENCHMARKS.md](BENCHMARKS.md) for measured baselines.
+The test suite includes state transitions, concurrent history writes, render-cache invalidation, ANSI selection styling, Unicode and long-name handling, exact golden output at 40/77/78/120 cells, alignment assertions, and line-width invariants for both adjustable fields and both screens from 1 through 500 cells, plus viewport-height bounds from 6 through 80 rows.
+
+`npm run test:ui` launches pi in an isolated temporary agent directory with three no-network fixture providers: a single-model provider, a 30-model catalog with long names and mixed capabilities, and a Unicode provider. It cannot alter normal pi settings and starts in offline mode. Press Enter on the prefilled `/model-picker` command to begin; exit after UI testing rather than submitting a normal model prompt, since fixture endpoints are intentionally unreachable. See [BENCHMARKS.md](BENCHMARKS.md) for measured baselines.
 
 The package uses pi's current APIs:
 
