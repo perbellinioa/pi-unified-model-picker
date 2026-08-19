@@ -103,6 +103,10 @@ The package uses pi's current APIs:
 - Fluid navigation: provider selection is a separate screen and is skipped when unnecessary.
 - Honest context controls: selectable context values never exceed the provider's advertised model window.
 
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development expectations. Report vulnerabilities according to [SECURITY.md](SECURITY.md), not through public issues.
+
 ## License
 
 MIT

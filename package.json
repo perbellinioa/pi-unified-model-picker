@@ -5,6 +5,15 @@
   "type": "module",
   "license": "MIT",
   "author": "perbellinioa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/perbellinioa/pi-unified-model-picker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/perbellinioa/pi-unified-model-picker/issues"
+  },
+  "homepage": "https://github.com/perbellinioa/pi-unified-model-picker#readme",
+  "packageManager": "npm@11.17.0",
   "keywords": [
     "pi-package",
     "pi",
@@ -17,6 +26,8 @@
     "docs/",
     "README.md",
     "BENCHMARKS.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
     "LICENSE"
   ],
   "pi": {
@@ -29,7 +40,8 @@
     "test": "node --import tsx --test test/**/*.test.ts",
     "test:ui": "tsx scripts/manual-ui-test.ts",
     "benchmark": "tsx scripts/benchmark.ts",
-    "validate": "npm run check && npm test"
+    "validate": "npm run check && npm test",
+    "prepublishOnly": "npm run validate"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "^0.84.0",
