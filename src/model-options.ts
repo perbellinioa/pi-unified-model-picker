@@ -1,4 +1,9 @@
-import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import {
+  getSupportedThinkingLevels,
+  type Api,
+  type Model,
+  type ModelThinkingLevel,
+} from "@earendil-works/pi-ai";
 
 export const STANDARD_CONTEXT_BUDGETS = [
   16_000,
@@ -64,6 +69,16 @@ export function sortModels(models: readonly Model<Api>[], recent: readonly Recen
 export function addRecentModel(recent: readonly RecentModel[], model: Pick<Model<Api>, "provider" | "id">, limit = 12): RecentModel[] {
   const next = { provider: model.provider, id: model.id };
   return [next, ...recent.filter((entry) => entry.provider !== next.provider || entry.id !== next.id)].slice(0, limit);
+}
+
+/**
+ * Return user-facing reasoning choices. Pi's `minimal` level is commonly an
+ * alias for provider `low` (and is not a distinct Copilot effort), so the
+ * picker omits that duplicate abstraction while preserving explicit xhigh
+ * and max capabilities from the model catalog.
+ */
+export function getSelectableThinkingLevels(model: Model<Api>): ModelThinkingLevel[] {
+  return getSupportedThinkingLevels(model).filter((level) => level !== "minimal");
 }
 
 export function normalizeThinkingLevel(

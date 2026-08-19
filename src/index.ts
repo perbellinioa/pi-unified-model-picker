@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import {
-  getSupportedThinkingLevels,
   type Api,
   type Model,
   type ModelThinkingLevel,
@@ -17,6 +16,7 @@ import {
   addRecentModel,
   formatTokenCount,
   getContextBudgetOptions,
+  getSelectableThinkingLevels,
   modelKey,
   normalizeThinkingLevel,
   sortModels,
@@ -110,7 +110,7 @@ async function showModelPicker(
     const currentBudget = isCurrent ? ctx.model!.contextWindow : undefined;
     budgets.set(modelKey(model), currentBudget && currentBudget <= model.contextWindow ? currentBudget : options.at(-1)!);
 
-    const levels = getSupportedThinkingLevels(model);
+    const levels = getSelectableThinkingLevels(model);
     const preferred = isCurrent ? pi.getThinkingLevel() : "medium";
     thinking.set(modelKey(model), normalizeThinkingLevel(levels, preferred));
   }
@@ -136,7 +136,7 @@ async function showModelPicker(
           const contextOptions = getContextBudgetOptions(model);
           const currentBudget = budgets.get(key)!;
           const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
-          const levels = getSupportedThinkingLevels(model);
+          const levels = getSelectableThinkingLevels(model);
           const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
           const reasoning = adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
           const cursor = index === selected ? ">" : " ";
@@ -153,7 +153,7 @@ async function showModelPicker(
           const contextOptions = getContextBudgetOptions(model);
           const currentBudget = budgets.get(key)!;
           const budgetOptions = [...new Set([...contextOptions, currentBudget])].sort((a, b) => a - b);
-          const levels = getSupportedThinkingLevels(model);
+          const levels = getSelectableThinkingLevels(model);
           const context = adjustableValue(formatTokenCount(currentBudget), index === selected && field === "context", budgetOptions.length > 1);
           const reasoning = adjustableValue(thinkingLabel(thinking.get(key)!), index === selected && field === "reasoning", levels.length > 1);
           const cursor = index === selected ? ">" : " ";
@@ -192,7 +192,7 @@ async function showModelPicker(
           const options = [...new Set([...getContextBudgetOptions(model), current])].sort((a, b) => a - b);
           if (options.length > 1) budgets.set(key, cycle(options, current, direction));
         } else {
-          const levels = getSupportedThinkingLevels(model);
+          const levels = getSelectableThinkingLevels(model);
           if (levels.length > 1) thinking.set(key, cycle(levels, thinking.get(key)!, direction));
         }
       } else if (matchesKey(data, Key.enter)) {

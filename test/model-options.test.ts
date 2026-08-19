@@ -6,6 +6,7 @@ import {
   filterModels,
   formatTokenCount,
   getContextBudgetOptions,
+  getSelectableThinkingLevels,
   normalizeThinkingLevel,
   sortModels,
 } from "../src/model-options.js";
@@ -61,6 +62,22 @@ test("recent models sort first and are de-duplicated", () => {
     { provider: "provider-a", id: "model-a" },
   ]);
   assert.deepEqual(sortModels([first, second], recent), [second, first]);
+});
+
+test("omits the duplicate minimal abstraction from reasoning choices", () => {
+  assert.deepEqual(
+    getSelectableThinkingLevels(model({
+      thinkingLevelMap: { minimal: "low", low: "low", xhigh: "xhigh", max: "max" },
+    })),
+    ["off", "low", "medium", "high", "xhigh", "max"],
+  );
+});
+
+test("preserves explicit max support for current Claude and GPT families", () => {
+  const opusOrSonnet = model({ thinkingLevelMap: { xhigh: "xhigh", max: "max" } });
+  const gpt56 = model({ thinkingLevelMap: { off: null, minimal: "low", low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max" } });
+  assert.equal(getSelectableThinkingLevels(opusOrSonnet).at(-1), "max");
+  assert.equal(getSelectableThinkingLevels(gpt56).at(-1), "max");
 });
 
 test("normalizes unsupported thinking levels", () => {
