@@ -36,3 +36,5 @@ npm run test:ui
 - Run `npm run validate` before submitting.
 - Run `npm run benchmark` for render-path changes and document meaningful regressions or improvements.
 - Do not commit credentials, auth files, sessions, local history, or screenshots containing sensitive data.
+
+Maintainers should follow [RELEASING.md](RELEASING.md) for versioning and trusted npm publication.

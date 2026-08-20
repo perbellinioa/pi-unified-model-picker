@@ -1,5 +1,9 @@
 # pi-unified-model-picker
 
+[![CI](https://github.com/perbellinioa/pi-unified-model-picker/actions/workflows/ci.yml/badge.svg)](https://github.com/perbellinioa/pi-unified-model-picker/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/pi-unified-model-picker.svg)](https://www.npmjs.com/package/pi-unified-model-picker)
+[![license](https://img.shields.io/npm/l/pi-unified-model-picker.svg)](LICENSE)
+
 A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-mono). Choose a provider, model, local context budget, and supported reasoning level through a compact keyboard-driven flow.
 
 ![Unified model picker preview](docs/model-picker.svg)
@@ -105,7 +109,7 @@ The package uses pi's current APIs:
 
 ## Contributing and security
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development expectations. Report vulnerabilities according to [SECURITY.md](SECURITY.md), not through public issues.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development expectations and [RELEASING.md](RELEASING.md) for the trusted publication process. Report vulnerabilities according to [SECURITY.md](SECURITY.md), not through public issues.
 
 ## License
 
