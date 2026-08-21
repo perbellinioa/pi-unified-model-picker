@@ -1,6 +1,6 @@
 {
   "name": "pi-unified-model-picker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A provider-agnostic model, context-budget, and reasoning picker for pi.",
   "type": "module",
   "license": "MIT",
@@ -34,7 +34,8 @@
   "pi": {
     "extensions": [
       "./src/index.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/perbellinioa/pi-unified-model-picker/main/docs/screenshots/model-selection-compact.png"
   },
   "scripts": {
     "check": "tsc --noEmit",
