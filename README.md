@@ -6,7 +6,7 @@
 
 A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-mono). Choose a provider, model, local context budget, and supported reasoning level through a compact keyboard-driven flow.
 
-![Unified model picker preview](docs/model-picker.svg)
+![Compact model-selection view](docs/screenshots/model-selection-compact.png)
 
 ## Features
 
@@ -22,6 +22,20 @@ A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-m
 - One-step selection through `/model-picker`
 
 > **Context budget:** this changes pi's local context/compaction budget for the currently selected model. It does not change the remote model's actual context window, and it resets when a later model switch or new session restores the catalog model. The picker never offers a budget above the advertised maximum.
+
+## Screenshots
+
+### Provider selection
+
+![Provider-selection view](docs/screenshots/provider-selection.png)
+
+### Wide model selection
+
+![Wide model-selection view](docs/screenshots/model-selection-wide.png)
+
+### Compact model selection
+
+![Compact model-selection view](docs/screenshots/model-selection-compact.png)
 
 ## Requirements
 
