@@ -45,7 +45,7 @@ A provider-agnostic model picker for [pi](https://github.com/earendil-works/pi-m
 
 ## Install
 
-From npm after publication:
+From npm:
 
 ```bash
 pi install npm:pi-unified-model-picker
